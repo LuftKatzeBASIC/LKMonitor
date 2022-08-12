@@ -1,7 +1,10 @@
 bits 16
 cpu 8086
-org 7c00h
-     
+org 0x7c00
+
+mov ax,0x03
+int 0x10
+
 cli
 mov word [0x20*4], l
 mov word [0x20*4+2], cs
@@ -16,10 +19,14 @@ l:
         call readln
         cmp byte [si],0x00
         je l
-        cmp byte [si],'r'
+        cmp byte [si],'#'
         je run
-        cmp byte [si],'s'
+        cmp byte [si],'='
         je set
+        cmp byte [si],'<'
+        je _dec
+        cmp byte [si],'>'
+        je _inc
 .l0:
         cmp byte [si+2], 0
         jne .nobyte
@@ -58,8 +65,8 @@ hex:
 .r:
         ret
 .err:
-        ;mov al,0xFF
         stc
+        ret
 .nr:
         cmp al,'0'
         jl .err
@@ -123,14 +130,10 @@ print:
         ret
 
 run:
+        mov byte [si],'0'
         inc si
         cmp byte [si],0x00
         je l.nobyte
-
-                dec si
-        mov byte [si],'0'
-        inc si
-
         push si
         xor cx,cx
 .loop0:
@@ -141,7 +144,9 @@ run:
         jmp .loop0
 .done:
         pop si
-        sub si,cx
+        mov ax,4
+        sub ax,cx
+        sub si,ax
 
         call hex
         jc l.nobyte
@@ -164,12 +169,10 @@ run:
         call dx
         jmp l
 set:
+        mov byte [si],'0'
         inc si
         cmp byte [si],0x00
         je l.nobyte
-        dec si
-        mov byte [si],'0'
-        inc si
         push si
         xor cx,cx
 .loop0:
@@ -203,24 +206,25 @@ set:
         jc l.nobyte
         add dl,al
         mov [address],dx
-        mov si,setaddress
-        call print
-        mov si,cmd
-        inc si
-        call print
         mov si,endl
         call print
         jmp l
+_dec:
+        dec word [address]
+        jmp l
 
-address: dw 0x600
+_inc:
+        inc word [address]
+        jmp l
 
+address: dw 0x500
 
-start: db "LK-MONITOR 0.13"
-pa: db 13,10,"Address: 0x600",13,10,0
-onlybyte: db "?",13,10,0
-setaddress: db "Address: 0x",0
-endl: db 13,10,0
-times(504-($-$$)) db 0
-times(6) db '0'
+start:          db "LK-MONITOR 0.22",13,10
+                db "OS: 7c00 to 0x7e10"
+pa:             db 13,10,"*=500",13,10,0
+onlybyte:       db "?",13,10,0
+endl:           db 13,10,0
+times 504-($-$$)db 0
+times(6)        db '0'
 cmd:
 dw 0xaa55
