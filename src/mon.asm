@@ -14,10 +14,12 @@ l:
         int 0x10
         mov si,cmd
         call readln
-        cmp word [si],0x0000+'r'
+        cmp byte [si],0x00
+        je l
+        cmp byte [si],'r'
         je run
-        cmp word [si],0x0000+'c'
-        je clear
+        cmp byte [si],'s'
+        je set
 .l0:
         cmp byte [si+2], 0
         jne .nobyte
@@ -121,21 +123,104 @@ print:
         ret
 
 run:
-        cmp byte [si+1],0
-        jne l.nobyte
-        call 0x600
+        inc si
+        cmp byte [si],0x00
+        je l.nobyte
+
+                dec si
+        mov byte [si],'0'
+        inc si
+
+        push si
+        xor cx,cx
+.loop0:
+        lodsb
+        cmp al,0
+        je .done
+        inc cx
+        jmp .loop0
+.done:
+        pop si
+        sub si,cx
+
+        call hex
+        jc l.nobyte
+        mov cl,al
+        mov al,16
+        mul cl
+        mov dh,al
+        call hex
+        jc l.nobyte
+        add dh,al
+        call hex
+        jc l.nobyte
+        mov cl,al
+        mov al,16
+        mul cl
+        mov dl,al
+        call hex
+        jc l.nobyte
+        add dl,al
+        call dx
         jmp l
-clear:
-        mov word [address],0x600
-        mov si, pa
+set:
+        inc si
+        cmp byte [si],0x00
+        je l.nobyte
+        dec si
+        mov byte [si],'0'
+        inc si
+        push si
+        xor cx,cx
+.loop0:
+        lodsb
+        cmp al,0
+        je .done
+        inc cx
+        jmp .loop0
+.done:
+        pop si
+        mov ax,4
+        sub ax,cx
+        sub si,ax
+
+        call hex
+        jc l.nobyte
+        mov cl,al
+        mov al,16
+        mul cl
+        mov dh,al
+        call hex
+        jc l.nobyte
+        add dh,al
+        call hex
+        jc l.nobyte
+        mov cl,al
+        mov al,16
+        mul cl
+        mov dl,al
+        call hex
+        jc l.nobyte
+        add dl,al
+        mov [address],dx
+        mov si,setaddress
+        call print
+        mov si,cmd
+        inc si
+        call print
+        mov si,endl
         call print
         jmp l
 
 address: dw 0x600
 
-start: db "LK-MONITOR 0.01"
-pa: db 13,10,"Address: 600H",13,10,10,0
+
+start: db "LK-MONITOR 0.13"
+pa: db 13,10,"Address: 0x600",13,10,0
 onlybyte: db "?",13,10,0
-times(510-($-$$)) db 0
+setaddress: db "Address: 0x",0
+endl: db 13,10,0
+times(504-($-$$)) db 0
+times(6) db '0'
 cmd:
 dw 0xaa55
