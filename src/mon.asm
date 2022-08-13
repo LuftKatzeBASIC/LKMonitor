@@ -28,8 +28,6 @@ l:
         cmp byte [si],'>'
         je _inc
 .l0:
-        cmp byte [si+2], 0
-        jne .nobyte
         call hex
         jc .nobyte
         mov cl,al
@@ -42,6 +40,14 @@ l:
         mov bx,[address]
         mov [bx],dh
         inc word [address]
+        cmp byte [si],0
+        je l
+        cmp byte [si+1],0
+        jne .l1
+        dec si
+        mov byte [si],'0'
+.l1:
+        call .l0
         jmp l
 .nobyte:
         mov si, onlybyte
@@ -219,7 +225,7 @@ _inc:
 
 address: dw 0x500
 
-start:          db "LK-MONITOR 0.22",13,10
+start:          db "LK-MONITOR 0.31",13,10
                 db "OS: 7c00 to 0x7e10"
 pa:             db 13,10,"*=500",13,10,0
 onlybyte:       db "?",13,10,0
