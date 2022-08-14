@@ -2,6 +2,7 @@ bits 16
 cpu 8086
 org 0x500
 
+
 mov dx,[0x7e00]
 mov [drive],dx
 
@@ -15,6 +16,7 @@ sti
 
 mov si,start
 call print
+
 l:
         mov ax,[address]
         mov al,ah
@@ -40,7 +42,10 @@ l:
 	je _content
         cmp byte [si],'.'
         je _string
-
+        cmp word [si],0x646c
+        je _ld
+        cmp word [si],0x7473
+        je _st
 .l0:
 	call hex
 	jc .nobyte
@@ -257,18 +262,21 @@ _inc:
 	inc word [address]
 	jmp l
 
+
+
 _content:
         cmp byte [si+1],0
         je .here
 	call gethex
+        jmp .ddd
 .here:
         mov dx,[address]
+.ddd:
 	mov si,dx
         push si
         mov si,numbln
         call print
         pop si
-        mov cx,0x123
 .loop0:
         mov ax,si
         mov al,ah
@@ -277,25 +285,27 @@ _content:
         call fhex
         mov ax,0x0e3a
         int 0x10
-        push cx
-        mov cx,0x0f
+        mov cx,0x10
 .loop1:
         lodsb
         call fhex
         loop .loop1
-        mov cx,0x0f
-        sub si,0x0f
+        mov cx,0x10
+        sub si,0x10
         mov ax,0x0e20
         int 0x10
 .loop2:
         lodsb
-        cmp al,0x7e
+        cmp al,0x20
+        jg .t2
+        jmp .dot
+.t2:
+        cmp al,0x7f
         jg .dot
-        cmp al,0x1f
-        jg .putc
+        jmp .k
 .dot:
         mov al,'.'
-.putc:
+.k:
         mov ah,0x0e
         int 0x10
         loop .loop2
@@ -303,11 +313,13 @@ _content:
         mov si,endl
         call print
         pop si
-        pop cx
-        cmp cx,0x0a
-        jl l
-        sub cx,0x0a
-        loop .loop0
+        mov dx,[address]
+        add dx,0x100
+        cmp si,dx
+        jle .loop0
+        jmp l
+
+
 
 fhex:
         push cx
@@ -335,15 +347,65 @@ fhex:
         ret
 
 
-address: dw 0x1000
+_ld:
+        inc si
+        call gethex
+        call calc
+        mov [RWOTS],dx
+.try:
+        xor ax,ax
+        int 0x13
+        mov ax,0x0201
+        xor bx,bx
+        mov es,bx
+        mov bx,[address]
+        mov cx,[RWOTS]
+        mov dx,[drive]
+        int 0x13
+        jc .try
+        jmp l
+
+
+_st:
+        inc si
+        call gethex
+        call calc
+        mov [RWOTS],dx
+.try:
+        xor ax,ax
+        int 0x13
+        mov ax,0x0301
+        xor bx,bx
+        mov es,bx
+        mov bx,[address]
+        mov cx,[RWOTS]
+        mov dx,[drive]
+        int 0x13
+        jc .try
+        jmp l
+
+calc:
+        add dx,0x04
+        mov ax,dx
+        xor dx,dx
+.loop0:
+        cmp ax,[DTS] 
+        jl .done
+        sub ax,[DTS]
+        inc dh
+.done:
+        mov dl,al
+        ret
+DTS: dw 0x09
+RWOTS: dw 0x00
+address: dw 0xF000
 
 start:          db "LK-Monitor version 0.44",13,10
-                db "Occupied space: 0x500-0xF00",13,10
-                db "Command buffer: 0xF10",13,10,10,0
+                db "Occupied space: 0x500-0xF00",13,10,0
 onlybyte:       db "?"
 endl:           db 13,10,0
-numbln: db "      1 2 3 4 5 6 7 8 9 A B C D E F      ASCII:",13,10,0
+numbln: db "      0 1 2 3 4 5 6 7 8 9 A B C D E F      ASCII:",13,10,0
 drive: dw 0x0000
 times 1018-($-$$)db 0
 times(4)	db '0'
-cmd equ 0xf10
+cmd:
