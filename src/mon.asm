@@ -400,7 +400,7 @@ DTS: dw 0x09
 RWOTS: dw 0x00
 address: dw 0xF000
 
-start:          db "LK-Monitor version 0.44",13,10
+start:          db "LK-Monitor version 0.45",13,10
                 db "Occupied space: 0x500-0xF00",13,10,0
 onlybyte:       db "?"
 endl:           db 13,10,0
