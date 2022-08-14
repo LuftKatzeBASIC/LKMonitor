@@ -2,6 +2,9 @@ bits 16
 cpu 8086
 org 0x500
 
+mov dx,[0x7e00]
+mov [drive],dx
+
 mov ax,0x03
 int 0x10
 
@@ -35,6 +38,13 @@ l:
 	je _inc
 	cmp byte [si],'?'
 	je _content
+        cmp byte [si],'.'
+        je _string
+        ;cmp word [si],0x444c
+        ;je _ld
+        ;cmp word [si],0x5453
+        ;je _st
+
 .l0:
 	call hex
 	jc .nobyte
@@ -62,9 +72,48 @@ l:
 	call print
 	jmp l
 
+_string:
+        mov di,[address]
+        mov si,cmd+1
+.loop0:
+        cmp word [si],0x6e2a
+        jne .s1
+        mov al,13
+        mov [di],al
+        inc di
+        mov al,10
+        mov [di],al
+        inc di
+        inc si
+        inc si
+        jmp .loop0
+.s1:
+        cmp word [si],0x2a2a
+        jne .s2
+        mov al,'*'
+        mov [di],al
+        inc di
+        inc si
+        inc si
+        jmp .loop0
+.s2:
+        movsb
+        cmp byte [si],0
+        je .done
+        jmp .loop0
+.done:
+        mov [address],di
+        jmp l
+
 hex:
 	clc
 	lodsb
+        cmp al,'a'
+        jl .n
+        cmp al,'z'
+        jg .n
+        sub al,32
+.n:
 	cmp al,0x00
 	je .r
 	cmp al,'G'
@@ -100,12 +149,6 @@ readln:
         je .back
 	cmp al,0x0d
 	je .enter
-        cmp al,'a'
-        jl .n
-        cmp al,'z'
-        jg .n
-        sub al,32
-.n:
 	mov ah,0x0e
 	int 0x10
 	mov [si],al
@@ -183,9 +226,15 @@ gethex:
 	ret
 
 run:
+        cmp byte [si+1],0
+        je .here
 	call gethex
 	call dx
 	jmp l
+.here:
+        mov dx,[address]
+        call dx
+        jmp l
 set:
 	call gethex
 	mov [address],dx
@@ -193,21 +242,37 @@ set:
 	call print
 	jmp l
 _dec:
+        cmp byte [si+1],0
+        je .sdec
+        call gethex
+        sub [address],dx
+        jmp l
+.sdec:
 	dec word [address]
 	jmp l
 
 _inc:
+        cmp byte [si+1],0
+        je .sinc
+        call gethex
+        add [address],dx
+        jmp l
+.sinc:
 	inc word [address]
 	jmp l
 
 _content:
+        cmp byte [si+1],0
+        je .here
 	call gethex
+.here:
+        mov dx,[address]
 	mov si,dx
         push si
         mov si,numbln
         call print
         pop si
-        mov cx,0x300
+        mov cx,0x123
 .loop0:
         mov ax,si
         mov al,ah
@@ -230,7 +295,7 @@ _content:
         lodsb
         cmp al,0x7e
         jg .dot
-        cmp al,0x20
+        cmp al,0x1f
         jg .putc
 .dot:
         mov al,'.'
@@ -273,14 +338,16 @@ fhex:
         pop ax
         ret
 
-address: dw 0xFF00
+
+address: dw 0x1000
 
 start:          db "LK-Monitor version 0.44",13,10
-                db "Occupied space: 0x500-0x900",13,10
-                db "Command buffer: 0x910",13,10,10,0
+                db "Occupied space: 0x500-0xF00",13,10
+                db "Command buffer: 0xF10",13,10,10,0
 onlybyte:       db "?"
 endl:           db 13,10,0
-numbln: db "      1 2 3 4 5 6 7 8 9 A B C D E F",13,10,0
-times 1022-($-$$)db 0
-times(2)	db '0'
-cmd equ $+0x10
+numbln: db "      1 2 3 4 5 6 7 8 9 A B C D E F      ASCII:",13,10,0
+drive: dw 0x0000
+times 1018-($-$$)db 0
+times(4)	db '0'
+cmd equ 0xf10
