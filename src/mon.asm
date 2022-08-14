@@ -40,10 +40,6 @@ l:
 	je _content
         cmp byte [si],'.'
         je _string
-        ;cmp word [si],0x444c
-        ;je _ld
-        ;cmp word [si],0x5453
-        ;je _st
 
 .l0:
 	call hex
