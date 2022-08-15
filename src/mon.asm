@@ -18,6 +18,10 @@ mov si,start
 call print
 
 l:
+        mov al,[drive]
+        call fhex
+        mov ax,0x0e3a
+        int 0x10
         mov ax,[address]
         mov al,ah
         call fhex
@@ -38,14 +42,18 @@ l:
 	je _dec
 	cmp byte [si],'>'
 	je _inc
+        cmp byte [si],'['
+        je prvdrv
+        cmp byte [si],']'
+        je nxtdrv
 	cmp byte [si],'?'
-	je _content
+	je content
         cmp byte [si],'.'
-        je _string
+        je string
         cmp word [si],0x646c
-        je _ld
+        je ld
         cmp word [si],0x7473
-        je _st
+        je st
 .l0:
 	call hex
 	jc .nobyte
@@ -73,7 +81,7 @@ l:
 	call print
 	jmp l
 
-_string:
+string:
         mov di,[address]
         mov si,cmd+1
 .loop0:
@@ -262,9 +270,29 @@ _inc:
 	inc word [address]
 	jmp l
 
+prvdrv:
+        cmp byte [si+1],0
+        je .sdec
+        call gethex
+        sub [drive],dl
+        jmp l
+.sdec:
+        dec word [drive]
+        jmp l
+
+nxtdrv:
+        cmp byte [si+1],0
+        je .sinc
+        call gethex
+        add [drive],dl
+        jmp l
+.sinc:
+        inc word [drive]
+        jmp l
 
 
-_content:
+
+content:
         cmp byte [si+1],0
         je .here
 	call gethex
@@ -272,12 +300,18 @@ _content:
 .here:
         mov dx,[address]
 .ddd:
+        mov [_c_end],dx
+        add word [_c_end],0x100
 	mov si,dx
         push si
         mov si,numbln
         call print
         pop si
 .loop0:
+        mov ax,0x0100
+        int 0x16
+        cmp ax,0x2e03
+        je _ctrlc
         mov ax,si
         mov al,ah
         call fhex
@@ -313,9 +347,7 @@ _content:
         mov si,endl
         call print
         pop si
-        mov dx,[address]
-        add dx,0x100
-        cmp si,dx
+        cmp si,[_c_end]
         jle .loop0
         jmp l
 
@@ -347,12 +379,16 @@ fhex:
         ret
 
 
-_ld:
+ld:
         inc si
         call gethex
         call calc
         mov [RWOTS],dx
+        mov byte [RWOTEC], 0x07
 .try:
+        cmp byte [RWOTEC], 0x00
+        je l.nobyte
+        dec byte [RWOTEC]
         xor ax,ax
         int 0x13
         mov ax,0x0201
@@ -366,12 +402,16 @@ _ld:
         jmp l
 
 
-_st:
+st:
         inc si
         call gethex
         call calc
         mov [RWOTS],dx
+        mov byte [RWOTEC], 0x07
 .try:
+        cmp byte [RWOTEC], 0x00
+        je l.nobyte
+        dec byte [RWOTEC]
         xor ax,ax
         int 0x13
         mov ax,0x0301
@@ -396,16 +436,26 @@ calc:
 .done:
         mov dl,al
         ret
+
+
+_ctrlc:
+        xor ax,ax
+        int 0x16
+        jmp l
+
 DTS: dw 0x09
-RWOTS: dw 0x00
 address: dw 0xF000
 
-start:          db "LK-Monitor version 0.45",13,10
-                db "Occupied space: 0x500-0xF00",13,10,0
+start:          db "LK-Monitor version 1.1",13,10,0
 onlybyte:       db "?"
 endl:           db 13,10,0
-numbln: db "      0 1 2 3 4 5 6 7 8 9 A B C D E F      ASCII:",13,10,0
-drive: dw 0x0000
+numbln: db "      0 1 2 3 4 5 6 7 8 9 A B C D E F     ASCII:",13,10,0
+drive equ 0x0007
+_c_end equ 0xF05
+
+RWOTS equ 0xF03
+RWOTEC equ 0xF01
+
 times 1018-($-$$)db 0
 times(4)	db '0'
 cmd:
